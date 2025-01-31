@@ -1,39 +1,49 @@
-#!/bin/bash
+#!/usr/bin/env bash
+source <(curl -s https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func)
+# Copyright (c) 2021-2025 tteck
+# Author: tteck (tteckster)
+# License: MIT | https://github.com/community-scripts/ProxmoxVE/raw/main/LICENSE
+# Source: https://casaos.io/
 
-# Configurações da VM
-VM_ID=150                # ID da VM
-VM_NAME="UmbrelOS"       # Nome da VM
-VM_DISK_SIZE="64G"       # Tamanho do disco
-VM_RAM="4096"           # Memória RAM (4GB)
-VM_CORES="2"            # Número de vCPUs
-ISO_URL="https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-12.5.0-amd64-netinst.iso"
-ISO_PATH="/var/lib/vz/template/iso/debian-12-netinst.iso"
+# App Default Values
+APP="CasaOS"
+var_tags="cloud"
+var_cpu="2"
+var_ram="2048"
+var_disk="8"
+var_os="debian"
+var_version="12"
+var_unprivileged="1"
 
-# Atualiza e instala pacotes necessários
-echo "🔄 Atualizando pacotes..."
-apt update && apt install -y curl wget qemu-guest-agent cloud-init
+# App Output & Base Settings
+header_info "$APP"
+base_settings
 
-# Baixa a ISO do Debian se não existir
-if [ ! -f "$ISO_PATH" ]; then
-    echo "📥 Baixando a ISO do Debian..."
-    wget -O "$ISO_PATH" "$ISO_URL"
-fi
+# Core
+variables
+color
+catch_errors
 
-# Cria a VM no Proxmox
-echo "⚙️ Criando a VM no Proxmox..."
-qm create $VM_ID --name $VM_NAME --memory $VM_RAM --cores $VM_CORES --net0 virtio,bridge=vmbr0 --ostype l26
-qm set $VM_ID --scsihw virtio-scsi-pci --scsi0 local-lvm:$VM_DISK_SIZE
-qm set $VM_ID --boot order=scsi0
-qm set $VM_ID --ide2 local:iso/debian-12-netinst.iso,media=cdrom
-qm set $VM_ID --agent enabled=1
-qm set $VM_ID --serial0 socket --vga serial0
+function update_script() {
+   header_info
+   check_container_storage
+   check_container_resources
+   if [[ ! -d /var ]]; then
+      msg_error "No ${APP} Installation Found!"
+      exit
+   fi
+   msg_info "Updating ${APP} LXC"
+   apt-get update &>/dev/null
+   apt-get -y upgrade &>/dev/null
+   msg_ok "Updated ${APP} LXC"
+   exit
+}
 
-# Inicia a VM para instalar o Debian
-echo "🚀 Iniciando a VM para instalação..."
-qm start $VM_ID
+start
+build_container
+description
 
-# Aguarda a instalação do Debian e configuração via SSH
-echo "⌛ Aguarde a instalação do Debian e configure um usuário root. Depois, rode este script novamente para instalar o Umbrel."
-
-echo "✅ Passo 1 finalizado! Agora acesse a VM via Proxmox e instale o Debian manualmente."
-exit 0
+msg_ok "Completed Successfully!\n"
+echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
+echo -e "${INFO}${YW} Access it using the following URL:${CL}"
+echo -e "${TAB}${GATEWAY}${BGN}http://${IP}${CL}"
